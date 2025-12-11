@@ -37,14 +37,6 @@ body {
     margin-bottom: 20px;
 }
 
-.answer-box {
-    background-color: #ffffff;
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid #ddd;
-    max-height: 400px;
-    overflow-y: auto;
-}
 
 button.stButton > button {
     background-color: #4A90E2;
