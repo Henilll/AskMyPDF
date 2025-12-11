@@ -21,13 +21,7 @@ body {
     font-family: 'Inter', sans-serif;
 }
 
-.pdf-card {
-    background-color: #f5f5f5;
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid #ddd;
-    margin-bottom: 20px;
-}
+
 
 .question-card {
     background-color: #ffffff;
