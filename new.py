@@ -3,115 +3,80 @@ import pdfplumber
 import numpy as np
 from groq import Groq
 
-# -------------------------
-# 🌈 Page Settings
-# -------------------------
+# --------------------------------
+# Basic Page Setup
+# --------------------------------
 st.set_page_config(
     page_title="AskMyPDF",
-    page_icon="📘",
-    layout="wide"
+    page_icon="📄",
+    layout="centered"
 )
 
-# -------------------------
-# 🌟 Custom CSS for Premium UI
-# -------------------------
+# --------------------------------
+# Clean Minimal Styles
+# --------------------------------
 st.markdown("""
 <style>
-
-html, body, [class*="css"] {
+body {
     font-family: 'Inter', sans-serif;
 }
-
-.main-container {
-    background: linear-gradient(135deg, #dff1ff, #f3e8ff);
-    padding: 40px 0;
-}
-
-.card {
-    background: rgba(255,255,255,0.55);
-    padding: 25px;
-    border-radius: 20px;
-    backdrop-filter: blur(18px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
-}
-
-.button {
-    background: linear-gradient(90deg, #4A90E2, #8E44AD);
-    color: white !important;
-    padding: 12px 20px;
-    border-radius: 12px;
-    text-align: center;
-    font-size: 18px;
-    transition: 0.3s;
-    cursor: pointer;
-}
-
-.button:hover {
-    background: linear-gradient(90deg, #357ABD, #732D91);
-    transform: translateY(-3px);
-}
-
-.answer-box {
-    background:white;
-    padding:18px;
-    border-radius:12px;
-    box-shadow:0 4px 15px rgba(0,0,0,0.1);
-}
-
-h1 {
-    background: -webkit-linear-gradient(45deg, #4A90E2, #9B59B6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 800;
+.header {
     text-align:center;
-    font-size:46px;
+    margin-top:10px;
 }
-
+.box {
+    background:#ffffff;
+    padding:20px;
+    border-radius:12px;
+    border:1px solid #e5e5e5;
+}
+.answer-box {
+    background:#f8f9fa;
+    padding:18px;
+    border-radius:10px;
+    border:1px solid #ddd;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------
-# 🌟 Beautiful Header
-# -------------------------
+# --------------------------------
+# Header
+# --------------------------------
 st.markdown("""
-<div class="main-container">
-    <h1>📘 AskMyPDF</h1>
-    <h3 style="text-align:center; color:#4b4b4b; margin-top:-10px;">
-        Your AI Assistant to Understand Any PDF Instantly
-    </h3>
+<div class='header'>
+    <h1>AskMyPDF</h1>
+    <p style="color:#555;font-size:15px;">
+        Upload your PDF and ask any question about its content.
+    </p>
 </div>
 """, unsafe_allow_html=True)
 
-
-# -------------------------
-# 🔒 Secure API Key
-# -------------------------
+# --------------------------------
+# API KEY (Hidden in Deployment)
+# --------------------------------
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 client = Groq(api_key=GROQ_API_KEY)
 
-if "requests_made" not in st.session_state:
-    st.session_state.requests_made = 0
+# --------------------------------
+# Limit 100 requests/day
+# --------------------------------
+if "requests" not in st.session_state:
+    st.session_state.requests = 0
+MAX_REQ = 100
 
-MAX_REQUESTS = 100
+# --------------------------------
+# PDF Upload
+# --------------------------------
+st.markdown("<div class='box'>", unsafe_allow_html=True)
+uploaded = st.file_uploader("📄 Upload PDF", type="pdf")
+st.markdown("</div>", unsafe_allow_html=True)
 
-
-# -------------------------
-# 📄 Upload Card
-# -------------------------
-with st.container():
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-
-    uploaded = st.file_uploader("📄 Upload your PDF", type="pdf")
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# -------------------------
-# 🧠 Extract + Process PDF
-# -------------------------
-def extract_text(pdf_bytes):
+# --------------------------------
+# Extract PDF Text
+# --------------------------------
+def extract_text(file):
     text = ""
-    with pdfplumber.open(pdf_bytes) as pdf:
+    with pdfplumber.open(file) as pdf:
         for page in pdf.pages:
             t = page.extract_text()
             if t:
@@ -119,89 +84,76 @@ def extract_text(pdf_bytes):
     return text
 
 
+# Simple lightweight embeddings
 def simple_embed(text, vocab=None):
     words = text.lower().split()
     if vocab is None:
         vocab = list(set(words))
-    vec = np.array([words.count(w) for w in vocab], dtype=np.float32)
-    if np.linalg.norm(vec) > 0:
-        vec /= np.linalg.norm(vec)
-    return vec, vocab
+    vector = np.array([words.count(w) for w in vocab], dtype=np.float32)
+    if np.linalg.norm(vector) > 0:
+        vector = vector / np.linalg.norm(vector)
+    return vector, vocab
 
 
 def search(q_vec, doc_vecs, top_k=5):
-    sims = [np.dot(q_vec, dv) for dv in doc_vecs]
+    sims = [np.dot(q_vec, d) for d in doc_vecs]
     return np.argsort(sims)[-top_k:][::-1]
 
 
-# -------------------------
-# 💬 Question Section
-# -------------------------
+# --------------------------------
+# Main Logic
+# --------------------------------
 if uploaded:
 
-    with st.spinner("✨ Reading your PDF..."):
+    with st.spinner("Extracting text…"):
         text = extract_text(uploaded)
 
     chunks = [text[i:i+1000] for i in range(0, len(text), 1000)]
 
     vocab = None
-    doc_vecs = []
+    doc_vectors = []
     for c in chunks:
         v, vocab = simple_embed(c, vocab)
-        doc_vecs.append(v)
-    doc_vecs = np.array(doc_vecs)
+        doc_vectors.append(v)
+    doc_vectors = np.array(doc_vectors)
 
-    st.success("✨ PDF Successfully Processed!")
+    st.success("PDF uploaded and processed!")
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    # Ask question
+    question = st.text_input("Ask something about your PDF:")
 
-    question = st.text_input(
-        "💬 Ask a question from your PDF",
-        placeholder="Example: What is the conclusion mentioned in the document?"
-    )
-
-    ask = st.button("🔍 Get Answer", use_container_width=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    if ask:
-        if st.session_state.requests_made >= MAX_REQUESTS:
-            st.error("⚠️ You reached your daily limit of 100 questions!")
+    if st.button("Get Answer"):
+        if st.session_state.requests >= MAX_REQ:
+            st.error("You reached your daily limit of 100 questions.")
         elif question.strip() == "":
-            st.error("Please type a question!")
+            st.error("Please enter a question.")
         else:
-            st.session_state.requests_made += 1
+            st.session_state.requests += 1
 
             q_vec, _ = simple_embed(question, vocab)
-            top_idx = search(q_vec, doc_vecs)
+            idx = search(q_vec, doc_vectors)
 
-            context = "\n\n---\n\n".join([chunks[i] for i in top_idx])
+            context = "\n---\n".join([chunks[i] for i in idx])
 
-            with st.spinner("🤖 Thinking… generating best possible answer…"):
+            with st.spinner("Thinking…"):
                 response = client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=[
-                        {"role": "system", "content": "Use ONLY the PDF content provided."},
+                        {"role": "system", "content": "Answer ONLY from the PDF context."},
                         {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
                     ]
                 )
 
-            st.markdown("### 📝 Answer")
-
+            st.markdown("### Answer")
             st.markdown(
                 f"<div class='answer-box'>{response.choices[0].message.content}</div>",
                 unsafe_allow_html=True
             )
 
-            st.info(f"📊 Request count: {st.session_state.requests_made}/100")
+            st.caption(f"Used {st.session_state.requests}/{MAX_REQ} requests today.")
 
 
-# -------------------------
-# 🌙 Footer
-# -------------------------
-st.markdown("""
-<br><br>
-<div style="text-align:center; color:#777;">
-Made with ❤️ by <b>Henil</b> | AskMyPDF Premium UI
-</div>
-""", unsafe_allow_html=True)
+# --------------------------------
+# Footer
+# --------------------------------
+st.markdown("<br><center style='color:#888;'>Made by Henil</center>", unsafe_allow_html=True)
