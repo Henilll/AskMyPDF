@@ -21,7 +21,14 @@ body {
     font-family: 'Inter', sans-serif;
 }
 
-
+.answer-box {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    max-height: 400px;
+    overflow-y: auto;
+}
 
 
 
