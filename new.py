@@ -1,51 +1,113 @@
 import streamlit as st
 import pdfplumber
-from groq import Groq
 import numpy as np
+from groq import Groq
 
 # -------------------------
-# 🔧 App Configuration
+# 🌈 Page Settings
 # -------------------------
 st.set_page_config(
     page_title="AskMyPDF",
     page_icon="📘",
-    layout="centered"
+    layout="wide"
 )
 
 # -------------------------
-# 🎨 Stylish Header
+# 🌟 Custom CSS for Premium UI
 # -------------------------
 st.markdown("""
-<div style="text-align:center; padding: 10px 0;">
-    <h1 style="color:#2E86C1; font-size: 42px; font-weight: bold;">📘 AskMyPDF</h1>
-    <h3 style="color:#555;">Ask questions directly from your PDF and get instant answers!</h3>
+<style>
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+.main-container {
+    background: linear-gradient(135deg, #dff1ff, #f3e8ff);
+    padding: 40px 0;
+}
+
+.card {
+    background: rgba(255,255,255,0.55);
+    padding: 25px;
+    border-radius: 20px;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+}
+
+.button {
+    background: linear-gradient(90deg, #4A90E2, #8E44AD);
+    color: white !important;
+    padding: 12px 20px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 18px;
+    transition: 0.3s;
+    cursor: pointer;
+}
+
+.button:hover {
+    background: linear-gradient(90deg, #357ABD, #732D91);
+    transform: translateY(-3px);
+}
+
+.answer-box {
+    background:white;
+    padding:18px;
+    border-radius:12px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.1);
+}
+
+h1 {
+    background: -webkit-linear-gradient(45deg, #4A90E2, #9B59B6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    text-align:center;
+    font-size:46px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------
+# 🌟 Beautiful Header
+# -------------------------
+st.markdown("""
+<div class="main-container">
+    <h1>📘 AskMyPDF</h1>
+    <h3 style="text-align:center; color:#4b4b4b; margin-top:-10px;">
+        Your AI Assistant to Understand Any PDF Instantly
+    </h3>
 </div>
 """, unsafe_allow_html=True)
 
 
 # -------------------------
-# 🔑 Secure API Key
+# 🔒 Secure API Key
 # -------------------------
-GROQ_API_KEY = st.secrets["GROQ_API_KEY"]     # never shown publicly
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 client = Groq(api_key=GROQ_API_KEY)
 
-# -------------------------
-# 🧮 Daily Request Counter
-# -------------------------
 if "requests_made" not in st.session_state:
     st.session_state.requests_made = 0
+
 MAX_REQUESTS = 100
 
 
 # -------------------------
-# 📤 Upload PDF
+# 📄 Upload Card
 # -------------------------
-st.markdown("### 📄 Upload your PDF")
-uploaded = st.file_uploader("Select your PDF file", type="pdf")
+with st.container():
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    uploaded = st.file_uploader("📄 Upload your PDF", type="pdf")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # -------------------------
-# 📘 Extract PDF Text
+# 🧠 Extract + Process PDF
 # -------------------------
 def extract_text(pdf_bytes):
     text = ""
@@ -57,90 +119,89 @@ def extract_text(pdf_bytes):
     return text
 
 
-# -------------------------
-# 🔍 Lightweight Embedding
-# -------------------------
 def simple_embed(text, vocab=None):
     words = text.lower().split()
     if vocab is None:
         vocab = list(set(words))
     vec = np.array([words.count(w) for w in vocab], dtype=np.float32)
     if np.linalg.norm(vec) > 0:
-        vec = vec / np.linalg.norm(vec)
+        vec /= np.linalg.norm(vec)
     return vec, vocab
 
 
-def search(query_vec, doc_vecs, top_k=5):
-    sims = [np.dot(query_vec, dv) for dv in doc_vecs]
-    idx = np.argsort(sims)[-top_k:][::-1]
-    return idx
+def search(q_vec, doc_vecs, top_k=5):
+    sims = [np.dot(q_vec, dv) for dv in doc_vecs]
+    return np.argsort(sims)[-top_k:][::-1]
 
 
 # -------------------------
-# 🧠 Main App Logic
+# 💬 Question Section
 # -------------------------
 if uploaded:
-    with st.spinner("📖 Reading your PDF..."):
+
+    with st.spinner("✨ Reading your PDF..."):
         text = extract_text(uploaded)
 
-    chunk_size = 1000
-    chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+    chunks = [text[i:i+1000] for i in range(0, len(text), 1000)]
 
-    doc_vecs = []
     vocab = None
-
+    doc_vecs = []
     for c in chunks:
         v, vocab = simple_embed(c, vocab)
         doc_vecs.append(v)
     doc_vecs = np.array(doc_vecs)
 
-    st.success("✅ PDF loaded successfully!")
+    st.success("✨ PDF Successfully Processed!")
 
-    st.markdown("### 🤔 Ask any question from your PDF")
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
     question = st.text_input(
-        "Ask here...",
-        placeholder="Example: Summarize the main points of section 3."
+        "💬 Ask a question from your PDF",
+        placeholder="Example: What is the conclusion mentioned in the document?"
     )
 
-    if st.button("🔍 Get Answer", use_container_width=True):
+    ask = st.button("🔍 Get Answer", use_container_width=True)
 
-        # Limit check
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if ask:
         if st.session_state.requests_made >= MAX_REQUESTS:
-            st.error("⚠️ Daily limit of 100 requests reached! Try again tomorrow.")
+            st.error("⚠️ You reached your daily limit of 100 questions!")
         elif question.strip() == "":
-            st.error("Please enter a question.")
+            st.error("Please type a question!")
         else:
             st.session_state.requests_made += 1
 
             q_vec, _ = simple_embed(question, vocab)
             top_idx = search(q_vec, doc_vecs)
-            context = "\n\n-----\n\n".join([chunks[i] for i in top_idx])
 
-            with st.spinner("🤖 Groq is thinking..."):
+            context = "\n\n---\n\n".join([chunks[i] for i in top_idx])
+
+            with st.spinner("🤖 Thinking… generating best possible answer…"):
                 response = client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=[
-                        {"role": "system", "content": "Answer ONLY using the provided PDF context."},
+                        {"role": "system", "content": "Use ONLY the PDF content provided."},
                         {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
                     ]
                 )
 
             st.markdown("### 📝 Answer")
-            st.text_area(
-                "Answer",
-                value=response.choices[0].message.content,
-                height=250
+
+            st.markdown(
+                f"<div class='answer-box'>{response.choices[0].message.content}</div>",
+                unsafe_allow_html=True
             )
 
-            st.info(f"📊 Requests used today: {st.session_state.requests_made}/100")
+            st.info(f"📊 Request count: {st.session_state.requests_made}/100")
 
 
 # -------------------------
-# 🔚 Footer
+# 🌙 Footer
 # -------------------------
 st.markdown("""
-<hr>
-<div style="text-align:center; color:gray;">
-Made with ❤️ by <b>Henil</b> | AskMyPDF v1.0
+<br><br>
+<div style="text-align:center; color:#777;">
+Made with ❤️ by <b>Henil</b> | AskMyPDF Premium UI
 </div>
 """, unsafe_allow_html=True)
