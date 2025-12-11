@@ -23,13 +23,7 @@ body {
 
 
 
-.question-card {
-    background-color: #ffffff;
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid #ddd;
-    margin-bottom: 20px;
-}
+
 
 
 button.stButton > button {
